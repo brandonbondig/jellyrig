@@ -1,8 +1,9 @@
-# jellyrig
+# Jellyrig — your own streaming service, on autopilot
 
-A complete home media server that runs itself. You (or your family) request a
-movie or show in a web app. The system finds it, downloads it, files it, and
-makes it streamable — with no manual steps in between.
+Request a movie or show in a web app. Jellyrig finds it, downloads it, files
+it, and makes it streamable — no manual steps in between. One
+`docker compose up`, and your household gets a private Netflix that
+maintains itself.
 
 **Who this is for:** you can use a Linux terminal, and you can run Docker.
 You do not need to know anything about Usenet or media automation — this
