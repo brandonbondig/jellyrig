@@ -18,9 +18,6 @@ Seerr (requests) ──► Sonarr / Radarr (automation) ──► Prowlarr (inde
                      Recyclarr (TRaSH quality profiles, auto-synced nightly)
 ```
 
-Optional (`--profile books`): Audiobookshelf (audiobook/ebook server with
-phone apps) + Shelfarr (Seerr-style request system for books).
-
 **Why Usenet-only, no VPN?** Downloads come over a single SSL connection to
 your provider (port 563) — nothing is shared or seeded, so there is nothing a
 VPN needs to hide. Fewer moving parts, full line speed.
@@ -56,10 +53,6 @@ sudo ./setup.sh
 docker compose up -d
 # with NVIDIA transcoding:
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
-# with the books stack too:
-docker compose --profile books up -d
-# flags combine, e.g. GPU + books:
-docker compose --profile books -f docker-compose.yml -f docker-compose.gpu.yml up -d
 ```
 
 Then walk the **first-run wiring** below — ~20 minutes, done once.
@@ -74,8 +67,6 @@ $DATA_ROOT                  # ONE filesystem - this is non-negotiable
 ├── media
 │   ├── movies              # Radarr root folder = Jellyfin Movies library
 │   └── tv                  # Sonarr root folder  = Jellyfin Shows library
-├── audiobooks              # (books profile)
-└── books                   # (books profile)
 ```
 
 Downloads and library **must live on the same filesystem**. Then an import is
@@ -106,8 +97,8 @@ Do these in order — each step feeds the next.
   `host_whitelist` — this is its DNS-rebinding protection, not a bug.
 - Folders: set Temporary Download Folder `/data/usenet/incomplete` and
   Completed Download Folder `/data/usenet/complete`.
-- Categories: add `movies`, `tv` (and `audiobooks`, `books` if using the
-  books profile) — folder = the category name, relative to completed.
+- Categories: add `movies` and `tv` — folder = the category name, relative
+  to completed.
 
 ### 2. Prowlarr — http://host:9696
 - Indexers → Add → your indexer (API key from its site).
@@ -156,15 +147,6 @@ default profile in Sonarr/Radarr.
 - One-time signup, then Settings → add your Jellyfin URL + an API key
   (Jellyfin Dashboard → API Keys).
 
-### 10. Books (optional, `--profile books`)
-- Audiobookshelf (http://host:13378): create admin, add libraries
-  `/audiobooks` and `/books`.
-- Shelfarr (http://host:5056): first signup becomes admin. Point it at
-  Prowlarr (`http://prowlarr:9696` + API key), SABnzbd (`http://sabnzbd:8080`
-  + API key, category `audiobooks`), and Audiobookshelf (`http://audiobookshelf:80`
-  + API token) in Admin → Settings. Set output paths `/audiobooks` and
-  `/ebooks`, and path mapping `/data/usenet/complete` → `/downloads`.
-
 ### Verify the loop
 Request something in Seerr. Watch it appear in SABnzbd within seconds,
 import moments after completion, and show up in Jellyfin. If import is slow
@@ -183,8 +165,6 @@ fix that first.
 | Prowlarr | 9696 | indexer management |
 | Bazarr | 6767 | subtitles |
 | Jellystat | 3000 | watch statistics |
-| Audiobookshelf | 13378 | audiobooks/ebooks (books profile) |
-| Shelfarr | 5056 | book requests (books profile) |
 
 ## GPU transcoding — and running without one
 

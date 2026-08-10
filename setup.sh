@@ -27,9 +27,7 @@ mkdir -p \
   "$DATA_ROOT"/usenet/incomplete \
   "$DATA_ROOT"/usenet/complete \
   "$DATA_ROOT"/media/movies \
-  "$DATA_ROOT"/media/tv \
-  "$DATA_ROOT"/audiobooks \
-  "$DATA_ROOT"/books
+  "$DATA_ROOT"/media/tv
 
 mkdir -p \
   "$CONFIG_ROOT"/sabnzbd \
@@ -42,10 +40,7 @@ mkdir -p \
   "$CONFIG_ROOT"/seerr \
   "$CONFIG_ROOT"/jellystat-db \
   "$CONFIG_ROOT"/jellystat/backup-data \
-  "$CONFIG_ROOT"/recyclarr \
-  "$CONFIG_ROOT"/audiobookshelf/config \
-  "$CONFIG_ROOT"/audiobookshelf/metadata \
-  "$CONFIG_ROOT"/shelfarr
+  "$CONFIG_ROOT"/recyclarr
 
 if [[ "$(id -u)" -eq 0 ]]; then
   chown -R "$PUID:$PGID" "$DATA_ROOT" "$CONFIG_ROOT"
