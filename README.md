@@ -58,6 +58,8 @@ docker compose up -d
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
 # with the books stack too:
 docker compose --profile books up -d
+# flags combine, e.g. GPU + books:
+docker compose --profile books -f docker-compose.yml -f docker-compose.gpu.yml up -d
 ```
 
 Then walk the **first-run wiring** below — ~20 minutes, done once.
@@ -99,6 +101,9 @@ Do these in order — each step feeds the next.
 ### 1. SABnzbd — http://host:8080
 - The first-run wizard asks for your Usenet provider: host, port **563**,
   **SSL on**, your provider username/password.
+- Access it by IP address. If you prefer a hostname (`http://mybox:8080`),
+  SABnzbd blocks it until you add the name to Config → Special →
+  `host_whitelist` — this is its DNS-rebinding protection, not a bug.
 - Folders: set Temporary Download Folder `/data/usenet/incomplete` and
   Completed Download Folder `/data/usenet/complete`.
 - Categories: add `movies`, `tv` (and `audiobooks`, `books` if using the
@@ -181,7 +186,17 @@ fix that first.
 | Audiobookshelf | 13378 | audiobooks/ebooks (books profile) |
 | Shelfarr | 5056 | book requests (books profile) |
 
-## GPU transcoding (NVIDIA)
+## GPU transcoding — and running without one
+
+**No GPU? The stack still works out of the box.** Most home streaming
+direct-plays: the file goes to the client as-is and transcoding never
+happens. When a transcode IS needed (an old TV, a low-bandwidth remote
+client), Jellyfin falls back to software encoding — figure on a modern
+quad-core handling 1–2 simultaneous 1080p transcodes. For a small household
+on a LAN that is usually plenty; add a GPU later if you outgrow it, nothing
+else changes.
+
+**NVIDIA:**
 
 1. Install the NVIDIA driver on the host. **Secure Boot gotcha:** DKMS-built
    modules are rejected by Secure Boot (`Key was rejected by service` in
