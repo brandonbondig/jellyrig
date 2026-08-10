@@ -87,65 +87,171 @@ RequiresMountsFor=/data
 
 ## First-run wiring
 
-Do these in order — each step feeds the next.
+One pass, in order — each step feeds the next. Have two things ready:
+your **Usenet provider** login and your **indexer** API key.
 
-### 1. SABnzbd — http://host:8080
-- The first-run wizard asks for your Usenet provider: host, port **563**,
-  **SSL on**, your provider username/password.
-- Access it by IP address. If you prefer a hostname (`http://mybox:8080`),
-  SABnzbd blocks it until you add the name to Config → Special →
-  `host_whitelist` — this is its DNS-rebinding protection, not a bug.
-- Folders: set Temporary Download Folder `/data/usenet/incomplete` and
-  Completed Download Folder `/data/usenet/complete`.
-- Categories: add `movies` and `tv` — folder = the category name, relative
-  to completed.
+Throughout: containers talk to each other by name (`http://sonarr:8989`),
+while **you** browse by host IP (`http://192.168.x.x:8989`). Every *arr app's
+API key lives in its **Settings → General**.
 
-### 2. Prowlarr — http://host:9696
-- Indexers → Add → your indexer (API key from its site).
-- Settings → Apps → add **Sonarr** (`http://sonarr:8989`) and **Radarr**
-  (`http://radarr:7878`) with their API keys (each app's Settings → General).
-  Prowlarr now pushes the indexer to both automatically.
+---
 
-### 3. Sonarr — http://host:8989
-- Settings → Media Management: add root folder `/data/media/tv`, enable
-  **Rename Episodes**.
-- Settings → Download Clients → SABnzbd: host `sabnzbd`, port `8080`, its
-  API key, category `tv`.
+### 1 · SABnzbd — `http://host:8080`
 
-### 4. Radarr — http://host:7878
-- Same as Sonarr with root folder `/data/media/movies` and category `movies`.
+*The downloader. A first-run wizard opens on first visit.*
 
-### 5. Recyclarr (TRaSH quality profiles)
+**Wizard — your Usenet provider:**
+
+| Field | Value |
+|---|---|
+| Host | your provider's server, e.g. `news.eweka.nl` |
+| Port | `563` |
+| SSL | **on** |
+| Username / password | from your provider |
+
+**Settings → Folders:**
+
+| Field | Value |
+|---|---|
+| Temporary Download Folder | `/data/usenet/incomplete` |
+| Completed Download Folder | `/data/usenet/complete` |
+
+**Settings → Categories** — add two:
+
+| Category | Folder |
+|---|---|
+| `movies` | `movies` |
+| `tv` | `tv` |
+
+> Browse it by IP. A hostname like `http://mybox:8080` is blocked until you
+> add it to **Config → Special → `host_whitelist`** — that's SABnzbd's
+> DNS-rebinding protection, not a bug.
+
+---
+
+### 2 · Prowlarr — `http://host:9696`
+
+*One search hub: add your indexer once, Prowlarr pushes it everywhere.*
+
+1. **Indexers → Add indexer** → find yours → paste its API key (from the
+   indexer's website).
+2. **Settings → Apps → Add application**, twice:
+
+| App | Prowlarr Server | Sync server | API key |
+|---|---|---|---|
+| Sonarr | `http://prowlarr:9696` | `http://sonarr:8989` | Sonarr's |
+| Radarr | `http://prowlarr:9696` | `http://radarr:7878` | Radarr's |
+
+The indexer now appears in Sonarr and Radarr automatically — never add
+indexers to them by hand.
+
+---
+
+### 3 · Sonarr — `http://host:8989`
+
+*TV automation: monitors shows, grabs new episodes forever.*
+
+- **Settings → Media Management**
+  - Add Root Folder → `/data/media/tv`
+  - Enable **Rename Episodes**
+- **Settings → Download Clients → Add → SABnzbd**
+
+| Field | Value |
+|---|---|
+| Host | `sabnzbd` |
+| Port | `8080` |
+| API key | SABnzbd → Config → General |
+| Category | `tv` |
+
+---
+
+### 4 · Radarr — `http://host:7878`
+
+*Movie automation. Identical to Sonarr, two values differ:*
+
+- Root folder → `/data/media/movies`
+- SABnzbd category → `movies`
+
+---
+
+### 5 · Recyclarr — quality profiles, no UI
+
+*Applies the community [TRaSH Guides](https://trash-guides.info) so releases
+are scored sanely (proper web/bluray tiers, junk releases rejected).*
+
 ```bash
 docker exec -it recyclarr recyclarr config create -t web-1080p -t hd-bluray-web
-# edit config/recyclarr/configs/*.yml: paste in the Sonarr/Radarr API keys
+```
+
+Edit the files it created under `config/recyclarr/configs/` — fill in the
+Sonarr and Radarr URLs (`http://sonarr:8989`, `http://radarr:7878`) and API
+keys — then:
+
+```bash
 docker exec recyclarr recyclarr sync
 ```
-This creates tuned quality profiles (`WEB-1080p`, `HD Bluray + WEB`) with
-~40 custom formats each, and re-syncs them nightly at 04:00. Set them as the
-default profile in Sonarr/Radarr.
 
-### 6. Jellyfin — http://host:8096
-- First-run wizard: create your admin account.
-- Add libraries: Movies → `/data/media/movies`, Shows → `/data/media/tv`.
-- GPU: Dashboard → Playback → Transcoding → NVENC, enable the codecs your
-  card supports.
+This builds a **WEB-1080p** profile in Sonarr and **HD Bluray + WEB** in
+Radarr (~40 custom formats each) and re-syncs nightly at 04:00. Set each as
+the default profile in its app.
 
-### 7. Bazarr — http://host:6767
-- Settings → Sonarr / Radarr: hosts `sonarr:8989` / `radarr:7878` + API keys.
-- Settings → Languages: create a profile, set it as default for both.
-- Settings → Providers: add a couple (e.g. OpenSubtitles, Embedded).
+---
 
-### 8. Seerr — http://host:5055
-- Sign in **with your Jellyfin account** → it links to Jellyfin
-  (`http://jellyfin:8096`), then add Sonarr and Radarr
-  (`http://sonarr:8989` / `http://radarr:7878`, pick the TRaSH profiles and
-  the root folders, enable auto-approve for yourself).
-- This is the app you give the household. Requests here kick off everything.
+### 6 · Jellyfin — `http://host:8096`
 
-### 9. Jellystat — http://host:3000
-- One-time signup, then Settings → add your Jellyfin URL + an API key
-  (Jellyfin Dashboard → API Keys).
+*The streaming server — this is what you watch with.*
+
+1. Wizard: create your admin account.
+2. Add libraries:
+
+| Library type | Folder |
+|---|---|
+| Movies | `/data/media/movies` |
+| Shows | `/data/media/tv` |
+
+3. GPU only: **Dashboard → Playback → Transcoding** → select **NVENC**
+   (or VAAPI/QSV for Intel/AMD) and enable the codecs your card supports.
+
+---
+
+### 7 · Bazarr — `http://host:6767`
+
+*Fetches subtitles for everything the *arrs import.*
+
+- **Settings → Sonarr** and **Settings → Radarr**: hosts `sonarr` / `radarr`,
+  ports `8989` / `7878`, their API keys.
+- **Settings → Languages**: create a language profile, set it as default
+  for both series and movies.
+- **Settings → Providers**: add a couple (OpenSubtitles, Embedded
+  Subtitles are good starters).
+
+---
+
+### 8 · Seerr — `http://host:5055`
+
+*The request app — the only URL the household needs.*
+
+1. **Sign in with your Jellyfin account** (same username/password).
+2. Setup wizard: Jellyfin hostname `jellyfin`, port `8096` — then pick the
+   libraries to sync.
+3. Add **Radarr**: hostname `radarr`, port `7878`, API key, quality profile
+   **HD Bluray + WEB**, root folder `/data/media/movies`, mark as default.
+4. Add **Sonarr**: hostname `sonarr`, port `8989`, API key, quality profile
+   **WEB-1080p**, root folder `/data/media/tv`, mark as default.
+5. **Settings → Users**: give auto-approve to the people you trust.
+
+A request here now drives the entire pipeline unattended.
+
+---
+
+### 9 · Jellystat — `http://host:3000`
+
+*Watch statistics (who watched what, when).*
+
+One-time signup, then **Settings**: Jellyfin URL `http://jellyfin:8096` + an
+API key from Jellyfin's **Dashboard → API Keys**.
+
+---
 
 ### Verify the loop
 Request something in Seerr. Watch it appear in SABnzbd within seconds,
