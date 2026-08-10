@@ -1,4 +1,4 @@
-name: jellystack
+name: jellyrig
 
 # One filesystem for downloads AND library (${DATA_ROOT}) is what makes
 # imports instant renames/hardlinks instead of slow copies. Do not split

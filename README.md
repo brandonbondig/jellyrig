@@ -1,4 +1,4 @@
-# jellystack
+# jellyrig
 
 A complete, Usenet-based, fully automated home media server in one
 `docker compose up`. Request a movie or show in a web UI → it is found,
@@ -37,7 +37,7 @@ indexer (~$10–15/year). Everything in this repo is free.
 ## Quick start
 
 ```bash
-git clone <this repo> && cd jellystack
+git clone <this repo> && cd jellyrig
 cp .env.example .env
 
 # 1. (recommended) dedicated service account
