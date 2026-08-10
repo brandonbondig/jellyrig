@@ -1,6 +1,6 @@
 # Jellyrig — the Jellyfin media stack, pre-assembled
 
-Jellyrig is not an app of its own. It is a curated bundle of the best
+A curated bundle of the best
 open-source media tools — [Jellyfin](https://jellyfin.org),
 [Seerr](https://github.com/seerr-team/seerr),
 [Sonarr](https://sonarr.tv), [Radarr](https://radarr.video),
@@ -23,9 +23,9 @@ guide that carries the lessons of a real build.
 You do not need to know anything about Usenet or media automation — this
 guide explains each part as it appears.
 
-**What you end up with:** after about an hour (10 minutes of commands,
-then a one-time walk through nine setup screens), you have your own
-private streaming service:
+**What you end up with:** one command, 3–5 minutes, and you have your own
+private streaming service — the installer wires every service together for
+you:
 
 ```
 Seerr (requests) ──► Sonarr / Radarr (automation) ──► Prowlarr (indexers)
@@ -46,7 +46,7 @@ Seerr (requests) ──► Sonarr / Radarr (automation) ──► Prowlarr (inde
 1. [What you need](#1-what-you-need)
 2. [Plan your storage — read before installing](#2-plan-your-storage--read-before-installing)
 3. [Install](#3-install)
-4. [Connect the services (one-time)](#4-connect-the-services-one-time)
+4. [The few things you still choose yourself](#4-the-few-things-you-still-choose-yourself)
 5. [Test the whole pipeline](#5-test-the-whole-pipeline)
 6. [Day-to-day operation](#6-day-to-day-operation)
 7. [Ports reference](#7-ports-reference)
@@ -113,214 +113,55 @@ folder — and the automation would conclude your whole library is missing.
 
 ```bash
 git clone <this repo> && cd jellyrig
-cp .env.example .env
-
-# 1. (recommended) create a dedicated service account
-sudo useradd -r -s /usr/sbin/nologin media
-id media                        # note the uid/gid → PUID/PGID in .env
-
-# 2. edit .env: PUID/PGID, timezone, DATA_ROOT, jellystat secrets
-
-# 3. create the directories from section 2
 sudo ./setup.sh
-
-# 4. start everything
-docker compose up -d
-# or, with an NVIDIA GPU (see section 8):
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
 ```
 
-All ten services are now running. They don't know about each other yet —
-that is section 4.
+That is the whole installation. `setup.sh` asks for your Usenet provider,
+your indexer key, and the admin account you want, then does everything else:
+creates the service user and directories, detects an NVIDIA GPU, starts the
+containers, and connects every service to every other service through their
+APIs.
 
-## 4. Connect the services (one-time)
+It takes 3–5 minutes. When it finishes, the stack is ready to download.
 
-Work through these nine screens **in order** — each step feeds the next.
-Keep two things at hand: your **provider** login and your **indexer** API key.
+**What it asks you**
 
-Two conventions used below:
-
-- Containers talk to each other by name: `http://sonarr:8989`.
-  **You** browse by address: `http://192.168.x.x:8989`.
-- Every Sonarr/Radarr/Prowlarr API key is in that app's
-  **Settings → General**.
-
----
-
-### 4.1 SABnzbd — `http://host:8080`
-
-*The downloader. A setup wizard opens on first visit.*
-
-**Wizard — enter your Usenet provider:**
-
-| Field | Value |
+| Question | What to enter |
 |---|---|
-| Host | your provider's server, e.g. `news.eweka.nl` |
-| Port | `563` |
-| SSL | **on** |
-| Username / password | from your provider |
+| Storage root | one filesystem for downloads + library (section 2) |
+| Timezone | detected automatically; press Enter to accept |
+| Usenet provider | host, port `563`, username, password |
+| Indexer | its name in Prowlarr's list, and your API key |
+| Admin account | the username/password you will log in with |
 
-**Settings → Folders:**
+Answers are saved to `.env` (mode 600, git-ignored) so a re-run does not ask
+twice. **Re-running is safe**: anything already configured is skipped, so if
+a step fails you fix the cause and run `sudo ./setup.sh` again.
 
-| Field | Value |
+**What it configures for you**
+
+- SABnzbd: your provider over SSL, download folders, `movies` and `tv`
+  categories, and API access for the other containers
+- Sonarr and Radarr: root folders, renaming, SABnzbd as download client,
+  and a Jellyfin refresh hook so imports appear immediately
+- Prowlarr: your indexer, pushed automatically into Sonarr and Radarr
+- Recyclarr: TRaSH Guides quality profiles (**WEB-1080p**,
+  **HD Bluray + WEB**), re-synced nightly
+- Jellyfin: admin account, Movies and Shows libraries
+- Seerr: linked to Jellyfin, Sonarr and Radarr, with those quality profiles
+- Bazarr: connected to Sonarr and Radarr
+
+## 4. The few things you still choose yourself
+
+`setup.sh` prints these at the end. They are left to you because they are
+preferences, not plumbing.
+
+| Service | What to do |
 |---|---|
-| Temporary Download Folder | `/data/usenet/incomplete` |
-| Completed Download Folder | `/data/usenet/complete` |
-
-**Settings → Categories** — add two:
-
-| Category | Folder |
-|---|---|
-| `movies` | `movies` |
-| `tv` | `tv` |
-
-> Browse SABnzbd by IP address. A hostname like `http://mybox:8080` is
-> blocked until you add it under **Config → Special → `host_whitelist`**.
-> This is SABnzbd protecting you from DNS-rebinding attacks, not a bug.
-
-**Done when:** the wizard's connection test succeeds.
-
----
-
-### 4.2 Prowlarr — `http://host:9696`
-
-*The indexer hub. Add your indexer once here; Prowlarr copies it to Sonarr
-and Radarr and keeps it in sync.*
-
-1. **Indexers → Add indexer** → find yours → paste its API key (from the
-   indexer's website).
-2. **Settings → Apps → Add application** — once for Sonarr, once for Radarr:
-
-| App | Prowlarr Server | Sync server | API key |
-|---|---|---|---|
-| Sonarr | `http://prowlarr:9696` | `http://sonarr:8989` | Sonarr's |
-| Radarr | `http://prowlarr:9696` | `http://radarr:7878` | Radarr's |
-
-Never add indexers to Sonarr or Radarr directly — always here.
-
-**Done when:** the indexer shows a green check in Prowlarr, and appears by
-itself under Settings → Indexers in both Sonarr and Radarr.
-
----
-
-### 4.3 Sonarr — `http://host:8989`
-
-*TV automation: watches your shows and fetches new episodes forever.*
-
-- **Settings → Media Management**
-  - Add Root Folder → `/data/media/tv`
-  - Turn on **Rename Episodes**
-- **Settings → Download Clients → Add → SABnzbd:**
-
-| Field | Value |
-|---|---|
-| Host | `sabnzbd` |
-| Port | `8080` |
-| API key | SABnzbd → Config → General |
-| Category | `tv` |
-
-**Done when:** the download client's Test button turns green.
-
----
-
-### 4.4 Radarr — `http://host:7878`
-
-*Movie automation. Configure it exactly like Sonarr — two values differ:*
-
-- Root folder → `/data/media/movies`
-- SABnzbd category → `movies`
-
-**Done when:** same green Test as Sonarr.
-
----
-
-### 4.5 Recyclarr — quality profiles (terminal, not a web page)
-
-*Installs the community [TRaSH Guides](https://trash-guides.info) quality
-profiles, so the automation picks good releases and rejects junk. Without
-this, quality settings are a research project of their own.*
-
-```bash
-docker exec -it recyclarr recyclarr config create -t web-1080p -t hd-bluray-web
-```
-
-Edit the files it created in `config/recyclarr/configs/`: fill in the URLs
-(`http://sonarr:8989`, `http://radarr:7878`) and both API keys. Then:
-
-```bash
-docker exec recyclarr recyclarr sync
-```
-
-This builds a **WEB-1080p** profile in Sonarr and **HD Bluray + WEB** in
-Radarr, and re-syncs them every night at 04:00.
-
-**Done when:** `sync` finishes without errors and the profiles appear in
-each app under Settings → Profiles. Set them as the default there.
-
----
-
-### 4.6 Jellyfin — `http://host:8096`
-
-*The streaming server — the app you watch with, on any device.*
-
-1. Wizard: create your admin account.
-2. Add two libraries:
-
-| Library type | Folder |
-|---|---|
-| Movies | `/data/media/movies` |
-| Shows | `/data/media/tv` |
-
-3. GPU owners only: **Dashboard → Playback → Transcoding** → pick **NVENC**
-   (NVIDIA) or **VAAPI/QSV** (Intel/AMD) and enable your card's codecs.
-
-**Done when:** both libraries exist (they are empty — that's correct).
-
----
-
-### 4.7 Bazarr — `http://host:6767`
-
-*Downloads subtitles automatically for everything that gets imported.*
-
-- **Settings → Sonarr** and **Settings → Radarr**: hosts `sonarr` / `radarr`,
-  ports `8989` / `7878`, their API keys.
-- **Settings → Languages**: create a profile with your language(s), set it
-  as default for both series and movies.
-- **Settings → Providers**: add a couple — OpenSubtitles and Embedded
-  Subtitles are good starters.
-
-**Done when:** both connection tests pass and a default language profile
-is set.
-
----
-
-### 4.8 Seerr — `http://host:5055`
-
-*The request app. This is the only address your household needs to know.*
-
-1. **Sign in with your Jellyfin account** — same username and password.
-2. Setup wizard: Jellyfin hostname `jellyfin`, port `8096` (enter them as
-   separate fields — a full URL is rejected). Pick the libraries to sync.
-3. Add **Radarr**: hostname `radarr`, port `7878`, its API key, quality
-   profile **HD Bluray + WEB**, root folder `/data/media/movies`,
-   mark as default.
-4. Add **Sonarr**: hostname `sonarr`, port `8989`, its API key, quality
-   profile **WEB-1080p**, root folder `/data/media/tv`, mark as default.
-5. **Settings → Users**: enable auto-approve for the people you trust.
-
-**Done when:** the Discover page shows movie posters.
-
----
-
-### 4.9 Jellystat — `http://host:3000`
-
-*Watch statistics: who watched what, when. Optional but nice.*
-
-One-time signup, then under **Settings** enter Jellyfin's URL
-(`http://jellyfin:8096`) and an API key from Jellyfin's
-**Dashboard → API Keys**.
-
-**Done when:** Jellystat lists your two libraries.
+| **Bazarr** — `http://host:6767` | Settings → Languages: create a profile in your language and set it as default. Settings → Providers: enable a couple (OpenSubtitles, Embedded Subtitles). |
+| **Jellystat** — `http://host:3000` | One-time signup, then Settings → Jellyfin URL `http://jellyfin:8096` and an API key from Jellyfin's Dashboard → API Keys. |
+| **Jellyfin** — `http://host:8096` | With a GPU: Dashboard → Playback → Transcoding → enable NVENC (or VAAPI/QSV). See section 8. |
+| **Prowlarr** — `http://host:9696` | Only if you skipped the indexer key: Indexers → Add indexer. |
 
 ## 5. Test the whole pipeline
 
@@ -409,6 +250,8 @@ to the `jellyfin` service and pick VAAPI or QSV in Jellyfin.
 | NVENC missing in Jellyfin's menu | toolkit not installed, or Secure Boot rejected the driver | section 8, step 1–2; check `nvidia-smi` works on the host first |
 | Whole library shows as missing after reboot | `/data` drive didn't mount before Docker started | add the `RequiresMountsFor` guard (section 2) |
 | Seerr rejects the Jellyfin address | full URL pasted into the hostname field | enter hostname `jellyfin` and port `8096` as separate fields |
+| `setup.sh` stops: "these ports are already in use" | another program owns a port the stack needs | stop it, or change the left-hand number in `ports:` in docker-compose.yml, then re-run |
+| A wiring step failed | usually a wrong key or an unreachable service | fix the cause and run `sudo ./setup.sh` again — finished steps are skipped |
 
 ---
 

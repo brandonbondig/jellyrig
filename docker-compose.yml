@@ -144,7 +144,7 @@ services:
 
   # ---------- TRaSH Guides profile sync ----------
   recyclarr:
-    image: ghcr.io/recyclarr/recyclarr:latest
+    image: ghcr.io/recyclarr/recyclarr:8   # no :latest tag is published
     container_name: recyclarr
     restart: unless-stopped
     user: ${PUID:-1000}:${PGID:-1000}
