@@ -1,0 +1,15 @@
+# NVIDIA hardware transcoding overlay.
+#
+# Requires the NVIDIA driver + nvidia-container-toolkit on the host
+# (see README - "GPU transcoding"). Start the stack with:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+#
+# Intel/AMD users: don't use this file - map /dev/dri into the jellyfin
+# service instead (see README).
+services:
+  jellyfin:
+    gpus: all
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,video,utility

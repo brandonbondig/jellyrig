@@ -1,0 +1,199 @@
+name: jellystack
+
+# One filesystem for downloads AND library (${DATA_ROOT}) is what makes
+# imports instant renames/hardlinks instead of slow copies. Do not split
+# /data across drives. See README - "The /data layout".
+
+x-common: &common
+  restart: unless-stopped
+  environment: &common-env
+    PUID: ${PUID:-1000}
+    PGID: ${PGID:-1000}
+    TZ: ${TZ:-Etc/UTC}
+    UMASK: "002"
+
+services:
+  # ---------- Download ----------
+  sabnzbd:
+    <<: *common
+    image: lscr.io/linuxserver/sabnzbd:latest
+    container_name: sabnzbd
+    ports:
+      - 8080:8080
+    volumes:
+      - ${CONFIG_ROOT:-./config}/sabnzbd:/config
+      - ${DATA_ROOT:-/data}/usenet:/data/usenet
+
+  # ---------- Indexers ----------
+  prowlarr:
+    <<: *common
+    image: lscr.io/linuxserver/prowlarr:latest
+    container_name: prowlarr
+    ports:
+      - 9696:9696
+    volumes:
+      - ${CONFIG_ROOT:-./config}/prowlarr:/config
+
+  # ---------- Automation ----------
+  sonarr:
+    <<: *common
+    image: lscr.io/linuxserver/sonarr:latest
+    container_name: sonarr
+    ports:
+      - 8989:8989
+    volumes:
+      - ${CONFIG_ROOT:-./config}/sonarr:/config
+      - ${DATA_ROOT:-/data}:/data
+    depends_on:
+      - sabnzbd
+      - prowlarr
+
+  radarr:
+    <<: *common
+    image: lscr.io/linuxserver/radarr:latest
+    container_name: radarr
+    ports:
+      - 7878:7878
+    volumes:
+      - ${CONFIG_ROOT:-./config}/radarr:/config
+      - ${DATA_ROOT:-/data}:/data
+    depends_on:
+      - sabnzbd
+      - prowlarr
+
+  # ---------- Subtitles ----------
+  bazarr:
+    <<: *common
+    image: lscr.io/linuxserver/bazarr:latest
+    container_name: bazarr
+    ports:
+      - 6767:6767
+    volumes:
+      - ${CONFIG_ROOT:-./config}/bazarr:/config
+      - ${DATA_ROOT:-/data}:/data
+    depends_on:
+      - sonarr
+      - radarr
+
+  # ---------- Streaming ----------
+  # For NVIDIA hardware transcoding, start with the GPU override:
+  #   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d
+  jellyfin:
+    <<: *common
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    ports:
+      - 8096:8096       # http
+      - 8920:8920       # https (optional)
+      - 7359:7359/udp   # client discovery on the LAN
+      - 1900:1900/udp   # DLNA
+    volumes:
+      - ${CONFIG_ROOT:-./config}/jellyfin:/config
+      - ${DATA_ROOT:-/data}/media:/data/media
+      - ${CONFIG_ROOT:-./config}/jellyfin-cache:/cache
+
+  # ---------- Requests ----------
+  # Jellyseerr was renamed to Seerr at v3 (2026); fallenbagel/jellyseerr is
+  # frozen at 2.7.3. The container keeps the old name so in-cluster URLs like
+  # http://jellyseerr:5055 stay stable.
+  jellyseerr:
+    image: ghcr.io/seerr-team/seerr:latest
+    container_name: jellyseerr
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Etc/UTC}
+      LOG_LEVEL: info
+    ports:
+      - 5055:5055
+    volumes:
+      - ${CONFIG_ROOT:-./config}/seerr:/app/config
+    depends_on:
+      - jellyfin
+      - sonarr
+      - radarr
+
+  # ---------- Watch statistics (Jellyfin equivalent of Tautulli) ----------
+  jellystat-db:
+    image: postgres:16-alpine
+    container_name: jellystat-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: jfstat
+      POSTGRES_USER: ${JELLYSTAT_DB_USER:?set in .env}
+      POSTGRES_PASSWORD: ${JELLYSTAT_DB_PASSWORD:?set in .env}
+    volumes:
+      - ${CONFIG_ROOT:-./config}/jellystat-db:/var/lib/postgresql/data
+
+  jellystat:
+    image: cyfershepard/jellystat:latest
+    container_name: jellystat
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${JELLYSTAT_DB_USER:?set in .env}
+      POSTGRES_PASSWORD: ${JELLYSTAT_DB_PASSWORD:?set in .env}
+      POSTGRES_IP: jellystat-db
+      POSTGRES_PORT: 5432
+      JWT_SECRET: ${JELLYSTAT_JWT_SECRET:?set in .env}
+      TZ: ${TZ:-Etc/UTC}
+    ports:
+      - 3000:3000
+    volumes:
+      - ${CONFIG_ROOT:-./config}/jellystat/backup-data:/app/backend/backup-data
+    depends_on:
+      - jellystat-db
+
+  # ---------- TRaSH Guides profile sync ----------
+  recyclarr:
+    image: ghcr.io/recyclarr/recyclarr:latest
+    container_name: recyclarr
+    restart: unless-stopped
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      TZ: ${TZ:-Etc/UTC}
+      CRON_SCHEDULE: "0 4 * * *"
+    volumes:
+      - ${CONFIG_ROOT:-./config}/recyclarr:/config
+    depends_on:
+      - sonarr
+      - radarr
+
+  # ---------- Books & audiobooks (optional) ----------
+  # Start with: docker compose --profile books up -d
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:latest
+    container_name: audiobookshelf
+    restart: unless-stopped
+    profiles: [books]
+    user: ${PUID:-1000}:${PGID:-1000}
+    environment:
+      TZ: ${TZ:-Etc/UTC}
+    ports:
+      - 13378:80
+    volumes:
+      - ${CONFIG_ROOT:-./config}/audiobookshelf/config:/config
+      - ${CONFIG_ROOT:-./config}/audiobookshelf/metadata:/metadata
+      - ${DATA_ROOT:-/data}/audiobooks:/audiobooks
+      - ${DATA_ROOT:-/data}/books:/books
+
+  # Seerr-style request system for books; delivers into Audiobookshelf.
+  shelfarr:
+    image: ghcr.io/pedro-revez-silva/shelfarr:latest
+    container_name: shelfarr
+    restart: unless-stopped
+    profiles: [books]
+    environment:
+      SOLID_QUEUE_IN_PUMA: "1"
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Etc/UTC}
+    ports:
+      - 5056:80
+    volumes:
+      - ${CONFIG_ROOT:-./config}/shelfarr:/rails/storage
+      - ${DATA_ROOT:-/data}/audiobooks:/audiobooks
+      - ${DATA_ROOT:-/data}/books:/ebooks
+      - ${DATA_ROOT:-/data}/usenet/complete:/downloads
+    depends_on:
+      - sabnzbd
+      - prowlarr
+      - audiobookshelf
