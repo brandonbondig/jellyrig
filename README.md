@@ -1,9 +1,23 @@
-# Jellyrig — your own streaming service, on autopilot
+# Jellyrig — the Jellyfin media stack, pre-assembled
 
-Request a movie or show in a web app. Jellyrig finds it, downloads it, files
-it, and makes it streamable — no manual steps in between. One
-`docker compose up`, and your household gets a private Netflix that
-maintains itself.
+Jellyrig is not an app of its own. It is a curated bundle of the best
+open-source media tools — [Jellyfin](https://jellyfin.org),
+[Seerr](https://github.com/seerr-team/seerr),
+[Sonarr](https://sonarr.tv), [Radarr](https://radarr.video),
+[Prowlarr](https://prowlarr.com), [SABnzbd](https://sabnzbd.org),
+[Bazarr](https://www.bazarr.media),
+[Recyclarr](https://recyclarr.dev) and
+[Jellystat](https://github.com/CyferShepard/Jellystat) — pre-wired the way
+the community recommends, so you skip days of wiki-reading.
+
+Together they behave like one system: request a movie or show in Seerr, and
+it is found, downloaded, filed, and streamable in Jellyfin with no manual
+steps in between. One `docker compose up` plus a one-time setup walk, and
+your household has a private streaming service that maintains itself.
+
+All credit for the software belongs to those projects. This repo only
+contributes the composition: a compose file, sane defaults, and a setup
+guide that carries the lessons of a real build.
 
 **Who this is for:** you can use a Linux terminal, and you can run Docker.
 You do not need to know anything about Usenet or media automation — this
