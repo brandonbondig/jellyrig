@@ -112,7 +112,7 @@ folder — and the automation would conclude your whole library is missing.
 ## 3. Install
 
 ```bash
-git clone <this repo> && cd jellyrig
+git clone https://github.com/brandonbondig/jellyrig.git && cd jellyrig
 sudo ./setup.sh
 ```
 
